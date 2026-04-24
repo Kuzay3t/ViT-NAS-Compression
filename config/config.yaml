@@ -1,0 +1,270 @@
+# config/search_space.yaml
+# Unified search space definition for ViT NAS + Compression
+
+# ============================================================
+# ARCHITECTURE CHOICES
+# ============================================================
+architecture:
+  depth:
+    type: "int"
+    choices: [6, 9, 12, 16]
+    default: 12
+    description: "Number of transformer encoder blocks"
+  
+  embed_dim:
+    type: "int"
+    choices: [192, 384, 576, 768]
+    default: 768
+    description: "Embedding/hidden dimension"
+  
+  num_heads:
+    type: "int"
+    choices: [3, 6, 9, 12]
+    default: 12
+    description: "Number of attention heads"
+  
+  mlp_ratio:
+    type: "float"
+    choices: [2.0, 3.0, 4.0, 5.0]
+    default: 4.0
+    description: "MLP hidden dim = mlp_ratio * embed_dim"
+  
+  patch_size:
+    type: "int"
+    choices: [8, 16, 32]
+    default: 16
+    description: "Patch size for dividing input images"
+  
+  dropout:
+    type: "float"
+    range: [0.0, 0.5]
+    step: 0.1
+    default: 0.0
+    description: "Dropout rate"
+  
+  attn_dropout:
+    type: "float"
+    range: [0.0, 0.5]
+    step: 0.1
+    default: 0.0
+    description: "Attention dropout rate"
+
+# ============================================================
+# COMPRESSION STRATEGIES
+# ============================================================
+compression:
+  pruning:
+    enabled: true
+    method:
+      type: "categorical"
+      choices: ["magnitude", "structured", "channel-wise", "none"]
+      default: "magnitude"
+      description: "Pruning method"
+    
+    layer_wise_ratios:
+      type: "list_of_floats"
+      min_length: 6
+      max_length: 16
+      element_range: [0.0, 0.9]
+      default: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      description: "Pruning ratio per layer"
+    
+    structured_granularity:
+      type: "categorical"
+      choices: ["head", "layer", "none"]
+      default: "none"
+      description: "Pruning granularity for structured pruning"
+  
+  quantization:
+    enabled: true
+    
+    layer_wise_bits:
+      type: "list_of_ints"
+      min_length: 6
+      max_length: 16
+      element_choices: [4, 6, 8, 16]
+      default: [8, 8, 8, 8, 8, 8]
+      description: "Quantization bit-width per layer"
+    
+    quantize_weights:
+      type: "bool"
+      default: true
+      description: "Apply quantization to weights"
+    
+    quantize_activations:
+      type: "bool"
+      default: true
+      description: "Apply quantization to activations"
+    
+    symmetric:
+      type: "bool"
+      default: true
+      description: "Use symmetric quantization"
+    
+    per_channel:
+      type: "bool"
+      default: true
+      description: "Use per-channel quantization scales"
+  
+  distillation:
+    enabled: true
+    
+    apply_to_layers:
+      type: "categorical"
+      choices: ["early", "mid", "late", "all", "none"]
+      default: "none"
+      description: "Which layers to distill"
+    
+    temperature:
+      type: "float"
+      range: [1.0, 20.0]
+      step: 0.5
+      default: 4.0
+      description: "Temperature for softmax in KD"
+    
+    kd_weight:
+      type: "float"
+      range: [0.0, 1.0]
+      step: 0.1
+      default: 0.5
+      description: "Weight of KD loss vs classification loss"
+    
+    teacher_config:
+      type: "categorical"
+      choices: ["base_vit", "larger_vit", "none"]
+      default: "none"
+      description: "Teacher model type"
+
+# ============================================================
+# ADAPTIVITY CONFIGURATION
+# ============================================================
+adaptivity:
+  enabled: true
+  
+  mechanism:
+    type: "categorical"
+    choices: ["early_exit", "token_dropping", "gating", "none"]
+    default: "none"
+    description: "Type of query-adaptive mechanism"
+  
+  early_exit:
+    enabled: false
+    
+    exit_points:
+      type: "list_of_ints"
+      min_length: 1
+      max_length: 4
+      element_range: [3, 16]
+      default: [6, 9, 12]
+      description: "Layer indices where early exits are placed"
+    
+    threshold:
+      type: "float"
+      range: [0.1, 0.9]
+      step: 0.1
+      default: 0.5
+      description: "Confidence threshold for early exit"
+    
+    exit_type:
+      type: "categorical"
+      choices: ["confidence", "layer_output", "custom"]
+      default: "confidence"
+      description: "Type of early exit decision"
+  
+  token_dropping:
+    enabled: false
+    
+    layer_wise_drop_ratios:
+      type: "list_of_floats"
+      min_length: 6
+      max_length: 16
+      element_range: [0.0, 0.5]
+      default: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+      description: "Token drop ratio per layer"
+    
+    drop_method:
+      type: "categorical"
+      choices: ["hard", "soft", "learned"]
+      default: "hard"
+      description: "Token dropping method"
+  
+  gating:
+    enabled: false
+    
+    placement:
+      type: "categorical"
+      choices: ["attention", "mlp", "both", "none"]
+      default: "none"
+      description: "Where to place gating modules"
+    
+    gate_threshold:
+      type: "float"
+      range: [0.0, 1.0]
+      step: 0.1
+      default: 0.5
+      description: "Threshold for gate activation"
+    
+    gate_hidden_dim:
+      type: "int"
+      choices: [64, 128, 256]
+      default: 128
+      description: "Hidden dimension of gating network"
+
+# ============================================================
+# HARDWARE CONSTRAINTS & TARGETS
+# ============================================================
+hardware:
+  target_devices:
+    type: "list_of_categorical"
+    choices: 
+      - "raspberry_pi_4"
+      - "jetson_nano"
+      - "jetson_xavier"
+      - "mobile_snapdragon"
+      - "pixel_6"
+      - "cpu_generic"
+    default: ["raspberry_pi_4"]
+    description: "Target deployment devices"
+  
+  target_latency_ms:
+    type: "float"
+    range: [10.0, 1000.0]
+    default: 100.0
+    description: "Target inference latency on device (ms)"
+  
+  max_memory_mb:
+    type: "float"
+    range: [64.0, 4096.0]
+    default: 512.0
+    description: "Maximum on-device memory (MB)"
+  
+  max_model_size_mb:
+    type: "float"
+    range: [1.0, 500.0]
+    default: 50.0
+    description: "Maximum model size on disk (MB)"
+  
+  max_energy_mj:
+    type: "float"
+    range: [1.0, 1000.0]
+    default: 100.0
+    description: "Maximum energy per inference (mJ)"
+
+# ============================================================
+# SEARCH META-PARAMETERS
+# ============================================================
+search:
+  num_candidates: 1000
+  description: "Total candidates to evaluate during NAS"
+  
+  accuracy_target:
+    type: "float"
+    range: [0.5, 1.0]
+    default: 0.8
+    description: "Target validation accuracy"
+  
+  accuracy_drop_tolerance:
+    type: "float"
+    range: [0.0, 0.2]
+    default: 0.02
+    description: "Acceptable accuracy drop (2% = 0.02)"
